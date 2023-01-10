@@ -1,0 +1,351 @@
+---
+title: "La lotería de Navidad"
+description: |
+ Enumero y analizo unas curiosidades de la lotería de Navidad
+author:
+  - name: Kaikai Qiu(Kaiqiu@alumni.uv.es)
+date: 2022-12-17
+categories: [trabajo BigData, la riqueza]
+image: "./posts/imagenes/imagen_01.png"
+title-block-banner: true 
+toc: true
+toc-location: left
+toc-depth: 3
+#css: ./assets/my_css_file.css
+---
+
+## **1. La introducción**
+
+
+La introducción:El Sorteo Extraordinario de Navidad, también conocido como Lotería de Navidad, es uno de los sorteos de lotería más importantes y populares que se celebra en España cada 22 de diciembre.  Se divide principalmente en 5 clases: el gordo, 4 000 000 €; 2º premio, 1 250 000 €; 3º premio, 500 000 €; 4º premio, con dos números, 200 000 € cada uno; 5º premio, con 8 números, 60 000 € cada uno; reintegro, 20 € si el último número es el mismo que el último número de gordo.El número específico de ganancias para cada billete de lotería depende del número de serie.
+
+
+![ ](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSmh_jALhgnGKKoP9ZAJ-c7bsZzAefh-ruwdA&usqp=CAU)
+
+
+---
+
+Primero hay que instalar y cargar unos paquetes necesarios.
+```{r}
+library(tidyverse)
+library(sf)
+library(ggplot2)
+library(plotly)
+library(gganimate)
+library(palmerpenguins)
+library(colorspace)
+library("readxl")
+library(viridis)
+library(geojsonsf)
+library(ggthemes)
+library(treemap)
+library(openxlsx)
+library(treemapify)
+```
+
+---
+
+## **2.¿Dónde se ha tocado más el gordo?**
+
+Aquí está la distribución de gordo en España a lo largo de su historia, tanto en orden alfabético como su valor
+
+::: {.panel-tabset}
+### Datos no reordendas
+
+```{r}
+#| code-fold: true
+la_direccion <- "./datos/provincia y gordo.csv"
+provincia_gordo <- rio::import(la_direccion)
+prov <- pjpv.curso.R.2022::LAU2_prov_2020_canarias
+
+ggplot(provincia_gordo,aes(province,veces,fill=province))+geom_bar(stat='identity')+coord_flip()+geom_text(aes(label=veces),
+            position = position_dodge2(width = 0.5, preserve = 'single'),
+            size= 3, hjust = 0 )+
+          lims(y=c(0,125))+
+          scale_y_continuous(limits = c(0,125), expand = c(0, 0))+
+  labs(title = "Número de veces que ha tocado cada provincia en orden alfabetico",
+       subtitle = "(un rollo)")
+
+```
+
+### Datos reordenados
+
+```{r}
+#| code-fold: true
+#con orden
+ggplot(provincia_gordo,aes(x= reorder(province,veces),y= veces,fill=province))+geom_bar(stat='identity')+coord_flip()+geom_text(aes(label=veces), position = position_dodge2(width = 0.5, preserve = 'single'),size= 3, hjust = 0 )+
+  lims(y=c(0,125))+
+  scale_y_continuous(limits = c(0,125), expand = c(0, 0))+
+  labs(title = "Número de veces que ha tocado el gordo cada provincia en funcion de veces",
+       x = "Provincias")+
+  theme(title=element_text(family="myFont",size=14,color="black",face="italic"),
+      axis.title.x=element_text(size=10,face="bold",color="black",hjust=0.5),
+      legend.title=element_text(size=14,color="red",hjust=0.5))
+```
+
+:::
+
+### **2.1 Datos reordenados pero con treemap**
+
+Con treepmap, podemos tener una comprensión más intuitiva del número y la comparación del número de veces que se ha tocado entre las provincias: podemos ver que Madrid es la comunidad / provincia más afortunada:107 veces, seguida por Barcelona. Y lo peor es Melilla, a quien nunca le ha tocado el Gordo en los 200 años de historia de la lotería de Navidad.
+```{r}
+#| code-fold: true
+#Tree map
+library(treemap)
+library(openxlsx)
+install.packages("treemapify")
+library(treemapify)
+ptree <- ggplot(data = provincia_gordo,aes(fill= province,area= veces, label= paste0(province,"\n",veces)))
+ptree <- ptree + geom_treemap()
+ptree <- ptree + geom_treemap_text(colour="white", place= "centre")
+ptree <- ptree + theme(legend.position = "none")
+ptree <- ptree + labs(title = "treemap de gordo:Número de veces que ha tocado el gordo cada                         provincia",
+                      subtitle = "(Melilla: 0)")+ 
+  theme(title=element_text(family="myFont",size=14,color="black",face="italic"))
+ptree
+```
+
+
+---
+
+## **3.La provincia más afortunada**
+
+
+Sin embargo, la lotería de navidad no es el "Gordo" solamente, los premios del segundo, tercer, cuarto y quinto premio también son muy atractivos, aunque los premios son menores que lo del gordo. Para calcular de manera más justa la "provincia más afortunada", asignamos puntos según la proporción de premio: 200/3 al Gordo, 125/6 a segundo premio, 25/3 a tercer premio, 10/3 a cuarto premio y 1 a quinto premio.
+
+>Solo considero la distribución del mismo número en todo el país por provincias, no considero números de series que están disponible en cada provincia ni "Centena (tres primeras cifras) del primero premio,etc", porque ya es mucho trabajo y tengo que copiar los datos desde los períodicos y recopilarlos. ——————Qiu Kaikai
+
+Podemos que la provincia más afortunada es Cantabria, seguida por Madrid.
+```{r}
+#| code-fold: true
+##3.la provincia más afortunada(de todas las provincias)
+
+todo <- read_excel("./datos/todo.xlsx")
+todop <- todo %>% mutate(punto= primero*200/3+ segundo*125/6+ tercero*25/3+ cuarto*10/3+ quinto)
+prov <- pjpv.curso.R.2022::LAU2_prov_2020_canarias
+df_todo <-  full_join(todop, prov, by = c("ine" = "ine_prov"))
+
+ptodo <- ggplot() + 
+  geom_sf(data = df_todo, 
+          aes(geometry = geometry,fill = punto), 
+          size = 0.09) +
+  scale_fill_viridis_c(option = "plasma")+
+  labs(title = "Puntos según todos los premio de 2021", 
+       caption = "datos viene de loteriasyapuestas.es") +
+  theme(plot.title=element_text
+        (family="Times",size=18,hjust = 0.5,color="black",face="bold"),
+        legend.title=element_text(size=12,face="bold",color="black",hjust=0.5))+
+  theme(plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "grey"))+
+  annotate(geom = "text",x= -4.03,y= 45.2,label="La provincia más afortunada: \n Cantabria",size=4.5)+
+  geom_segment(aes(x= -4.03, y= 44.6, xend= -4.03, yend= 43.2), size=1.5, arrow = arrow(length = unit(0.3,"cm")))
+  
+ptodo
+```
+
+---
+
+## **4. El gasto medio por habitante en loteria por CCAA y provincia, 2021**
+
+
+Comprar boletos de lotería de Navidad parece ser una costumbre navideña nacional, cuanto más cerca del 22 de diciembre, más larga es la fila afuera de Loterías y Apuestas del Estado. Pero las personas en diferentes lugares gastan diferentes cantidades de dinero en la lotería de Navidad. Los dos gráficos siguientes muestran el gasto medio de los residentes de diferentes comunidades autónomas y provincias en la lotería de Navidad.
+
+### **4.1 A nivel Comunidades Autónomas**
+
+*Puede poner el cursor por el territorio de cada comunidad autónoma para conocer el dato concreto.*
+Podemos ver que Castilla y León es el líder de todo el país, mientras que en Ceuta y Melilla los gastos son menor de 20 euros.
+```{r}
+#| code-fold: true
+##4.El gasto medio por habitante en loteria por CCAA y provincia, 2021
+library("readxl")
+my_data <- read_excel("./datos/gasto_ccaa.xlsx")
+library(tidyverse)
+library(sf)
+library(viridis)
+prov <- pjpv.curso.R.2022::LAU2_prov_2020_canarias
+prov <- prov %>% select(ine_prov, ine_prov.n, ine_ccaa, ine_ccaa.n)
+df_geo_ccaa <- prov %>% 
+  group_by(ine_ccaa, ine_ccaa.n) %>% summarize() %>% ungroup() 
+df_ok <-  full_join(df_geo_ccaa, my_data, by = c("ine_ccaa" = "codigo"))
+##CCAA color
+df_ok = sf::st_cast(df_ok, "MULTIPOLYGON")
+p <- ggplot(data = df_ok, 
+            aes(geometry = geometry,fill = gasto), 
+            size = 0.09) + 
+     geom_sf() + scale_fill_viridis(option="magma")+
+    labs(title = "Gasto medio por habitante en lotería de navidad, CCAA", 
+       caption = "datos viene de loteriasyapuestas.es",
+       fill = "gasto medio") +
+     theme(plot.title=element_text
+        (family="Times",size=18,hjust = 0.5,color="black",face="bold"),
+         legend.title=element_text(size=12,face="bold",color="black",hjust=0.5))
+
+
+ggplotly(p)
+```
+
+### **4.2 A nivel provincias**
+
+Entre las 52 regiones de nivel provincia por todo el país, Soria ha ganado campeonato con dato increíble: 224€. Esto implica que cada soriano va a comprar más de 11 décimos por cada año. Sin embargo, en los gráficos anteriores sobre "la provincia más afortuna", no aparece Soria. Podemos concluir que Soria es la provincia más desafortunada de España🤣🤣🤣🤣 
+```{r}
+#| code-fold: true
+library(geojsonsf)
+provincia <- pjpv.curso.R.2022::LAU2_prov_2020_canarias
+mi_data <- read_excel("./datos/gastop.xlsx")
+gasto_provincia_1 <- full_join(mi_data,provincia,by=c("ine"="ine_prov")) 
+library(plotly)
+library(sf)
+pprovincia <- ggplot() + 
+  geom_sf(data = gasto_provincia_1, 
+          aes(geometry = geometry,fill = gasto_medio), 
+          size = 0.09) +
+  scale_fill_viridis_c(option = "plasma")+
+  labs(title = "Gasto medio por habitante en lotería de navidad por provincia", 
+       caption = "datos viene de loteriasyapuestas.es") +
+  theme(plot.title=element_text
+        (family="Times",size=14,hjust = 0.5,color="black",face="bold"),
+        legend.title=element_text(size=12,face="bold",color="black",hjust=0.5))+
+  theme(plot.background = element_rect(fill = "grey"),
+        panel.background = element_rect(fill = "grey"))+
+  annotate(geom = "text",x= -2.46,y= 41.76,label="Soria \n 224€",size=3)+
+  annotate(geom = "text",x= -2.93,y= 35.29,label="Melilla \n 14€",size=3)+
+  annotate(geom = "text",x= 2.5,y= 37,label="Media de España \n 66.6€",size=5,alpha=1)
+pprovincia
+
+```
+
+---
+
+## **5.Relación entre gasto medio de lotería y renta media**
+
+
+Entonces, ¿por qué se gasta tanto dinero en Soria? voy a analizar relación entre gasto medio de lotería y renta media.
+```{r}
+#| code-fold: true
+##relación entre gasto medio de lotería y renta media
+renta <- read_excel("./datos/gastoyrenta.xlsx")
+df_renta <- ggplot(renta,aes(gasto_medio,renta_neta_media))+ geom_point(color="Green",size=3) + geom_text(aes(label=provincia),size=3,vjust=-1)+
+  geom_smooth(method = "lm",color= "Red",se = FALSE)+
+  theme_light()+
+  scale_x_continuous(breaks = seq(0, 250, 25),limits = c(0,250))+
+  labs(title = 
+         "La relación entre la renta neta media y gasto medio en la lotería de Navidad", 
+       subtitle = "(por provincias)",
+       caption = "datos viene de INE y loteriasyapuestas.es",
+       x = "gasto medio en la lotería de Navidad",
+       y = "renta neta media")+
+  theme(plot.title=element_text(family="Times",size=16,hjust = 0.5,color="black",face="bold"),
+       plot.subtitle=element_text(size=10,face="bold",color="black",hjust=1),
+        axis.title.x=element_text(size=10,face="bold",color="black",hjust=0.5),
+        axis.title.y=element_text(size=10,face="bold",color="black",hjust=0.5),
+        legend.title=element_text(size=12,face="bold",color="black",hjust=0.5))+
+  annotate(geom = "text",x= 175,y= 12000,label="gasto medio=0.0063renta neta-6.87",size=4)
+
+ggplotly(df_renta)
+
+```
+
+Podemos decir por cada aumento 1000 de renta media neta por habitante, va a gastar 6 euros en la lotería de Navidad.
+
+---
+
+## **6.El número más afortunado**
+
+
+Los números de Gordo también son muy ¨importantes¨, en especial el último número, **El reintegro**: si el último de nuestro décimo le coincide, recuperaremos nuestro 20 euros. En este gráfico, resumimos las veces que cada número ha aparecido como el reintegro en la historia.
+```{r}
+#| code-fold: true
+##6.El reintegro
+library(ggthemes)
+el_link <- "./datos/numeros1812 .csv"
+reintegro <- rio::import(el_link)
+reintegro <- reintegro %>% tidyr::separate(gordo,sep = "",into=c("primero","segundo","terceo","cuarto","quinto","sexto")) %>%
+  mutate(ultimo=ifelse(is.na(sexto),quinto,sexto)) %>%
+  mutate(ultimonumero=ifelse(is.na(ultimo),cuarto,ultimo)) %>% select(1:9)
+reintegro1 <- reintegro %>% group_by(ultimonumero)%>% summarise(NN=n()) 
+
+ggplot(data = reintegro1,aes(ultimonumero,NN,fill= ultimonumero )) + 
+  geom_bar(stat='identity') +
+  geom_text(aes(label=NN),
+             position = position_dodge2(width = 0.5, preserve = 'single'),
+             size= 6, hjust = 0.5 )+
+  scale_y_continuous(limits = c(0,35), expand = c(0, 0)) +
+  labs(title = "5，el reintegro más frecuente",
+       x = "Los números",
+       y = "veces")+
+  scale_fill_discrete(name = "Los números")+
+         theme_solarized()+
+  theme(plot.title=element_text(family="Times",size=16,hjust = 0.5,color="black",face="bold"),
+        axis.title.x=element_text(size=10,face="bold",color="black",hjust=0.5),
+        axis.title.y=element_text(size=10,face="bold",color="black",hjust=0.5),
+        legend.title=element_text(size=12,face="bold",color="black",hjust=0.5))+
+  scale_color_brewer(palette = "Dark2")
+```
+Podemos ver el número 4, 5 y 6 son los afortunados.
+
+
+---
+
+## **7.Unas administraciones de lotería famosas**
+
+
+Durante los más de 200 años de historia de la lotería de Navidad, ha habido muchos lugares de lotería famosos que he marcado en el mapa a continuación. Lo más famoso, por supuesto es **Doña Manolita** de Madrid, un auténtico símbolo de la capital española. Esta administración vende alrededor de 70 millones de décimos al año, sobre todo en esta época del año y en relación al Sorteo Extraordinario. 
+
+En cuanto a nuestra Comunitat, se destaca **Lotería Manises**. La administración de lotería Manises ha conseguido repartir El Gordo durante los años 1971, 1986, 2001, 2013, y 2018, lo que ha convertido al municipio de 30.000 habitantes en la localidad de España donde más veces ha caído el primer premio de la Lotería de Navidad.
+
+```{r}
+#| include: FALSE
+library(leaflet)
+leaflet() %>% addTiles() %>% leafem::addMouseCoordinates()
+```
+
+```{r}
+#| code-fold: true
+m <- leaflet() %>%
+  addTiles() %>% 
+  setView(lng = -3.70474, lat = 40.41897, zoom = 6) %>% 
+  addMarkers(lng = -3.70474, lat = 40.41897, popup = "Doña Manolita") %>% 
+  addMarkers(lng = -0.45648, lat = 39.49060, popup = "Lotería Manises") %>% 
+  addMarkers(lng =  2.16538, lat = 41.38885, popup = "El gato negro") %>% 
+  addMarkers(lng = -1.13289, lat = 37.98457, popup = "La envidiosa millonaria de Murcia") %>%
+  addMarkers(lng = -2.93637, lat = 43.26162, popup = "Ormaechea de Bilbao") %>% 
+  addMarkers(lng = -5.99445, lat = 37.39087, popup = "Sagasta los millones de Sevilla") %>%
+  addMarkers(lng = -4.78587, lat = 41.62857, popup = "La rana de oro de Valladolid") %>%
+  addPopups(lng = -3.70474, lat = 40.41897, popup = "Doña Manolita") %>% 
+  addPopups(lng = -0.45648, lat = 39.49060, popup = "Lotería Manises") %>% 
+  addPopups(lng =  2.16538, lat = 41.38885, popup = "El gato negro") 
+m
+```
+
+
+---
+
+## **8. Conclusión**
+
+
+Personalmente, "comprar lotería" es un evento aleatorio, y no podemos encontrar ninguna regla. Esas "provincias de la suerte y tiendas de lotería" son solo por las grandes ventas. Si realmente quiere aumentar sus posibilidades de ganar, todavía tiene que ir a esas grandes ciudades para comprar; si solo quiere recuperar su dinero, comprar números que terminen en 4~6 sería una buena opción. Pero no invierta demasiado dinero, no vale la pena invertir en un evento de pequeña probabilidad.
+Finalmente, ¡suerte a todos!
+
+(Os adjunto el vídeo que hicieron el sorteo)
+```{r, echo = FALSE, out.width = "60%"}
+library(vembedr)
+embed_url("https://www.youtube.com/watch?v=3pzCtzf3wG8")
+```
+
+---
+
+### **Bibliografía**
+-[Lotería de Navidad: números premiados, en datos y gráficos](https://www.epdata.es/datos/loteria-navidad-numeros-premiados-datos-graficos/246)
+
+-[20minutos](https://www.20minutos.es/noticia/4908474/0/gordo-sorteo-loteria-navidad-2021/)
+
+-[El país](https://elpais.com/loteria-de-navidad/2021-12-22/segundo-premio-de-la-loteria-de-navidad-2021.html)
+
+-[Estos son los quintos premios en la Lotería de Navidad: 89109, 34345, 89053, 69457, 92052, 70316, 26711 y 24198](https://www.lavanguardia.com/loterias/loteria-navidad/20211222/7932050/quinto-premio-loteria-navidad-2021.html)
+
+
+
+---
+
+
+

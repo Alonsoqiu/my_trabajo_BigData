@@ -1,0 +1,67 @@
+project:                
+  type: website          
+  output-dir: docs        #- NO TOCAR: carpeta donde se redirige el output
+  
+website:
+  title: "儒雅随和"
+  favicon: sml.jpg
+  # site-url: https://....               #- hay que rellenarlos
+  # repo-url: https://....
+  # repo-actions: [edit, issue]
+  search:   
+    location: navbar
+    type: overlay   
+    copy-button: true
+  navbar:
+    logo: "sml.jpg"           #---
+    background: "#e3211e"    #- color de la navbar
+    foreground: "#2e2929"    #- color navigation elements, text and links that appear in the navbar.
+    left: 
+      - icon: house-door
+        href: index.html
+    right:
+      - text: "Trabajo"   #---
+        href: my_trabajo_BigData.qmd   
+      - icon: github
+        href: https://github.com/Alonsoqiu    #---
+      - icon: twitter
+        href: https://twitter.com/realdonaldtrump  #---
+      - icon: envelope
+        url: "mailto:kaiqiu@alumni.uv.es"            #---
+  page-footer:
+    border: true
+    background: "#ebeb13"
+    left: "© Qiu Kaikai"   #----
+    center: "Hecho con [Quarto](https://quarto.org)"
+    right:
+      - icon: github
+        href: https://github.com/Alonsoqiu   #----
+      - icon: twitter
+        href: https://twitter.com/realdonaldtrump  #-----
+      - icon: envelope
+        url: "mailto:kaiqiu@alumni.uv.es"            #-----
+    
+format:
+  html:
+    theme: yeti           #---
+    highlight-style: a11y   #---
+    css: my_styles.css   
+    page-layout: full
+    toc: true
+    code-copy: true
+    code-overflow: wrap    #- {wrap, scroll}
+    
+
+# Enable CC licence appendix
+license: "CC BY"
+
+lang: es   #- {es, en}
+
+
+# Default execute options
+execute:
+  echo: true
+  message: false
+  warning: false
+  eval: true
+
